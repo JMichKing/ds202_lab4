@@ -1,0 +1,72 @@
+---
+title: "Lab 4"
+author: "John King"
+date: "10/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Setup
+
+```{r, warning=FALSE}
+library(readxl)
+defense <- read_excel('./cyclonesFootball2019.xlsx', sheet='Defensive')
+offense <- read_excel('./cyclonesFootball2019.xlsx', sheet='Offensive')
+bio <- read_excel('./cyclonesFootball2019.xlsx', sheet='Biography')
+```
+
+## Part One
+
+ *Names are Factors*
+
+```{r, warning=FALSE}
+defClean <- defense
+defClean["Name"] <- factor(defense$Name)
+defClean["Opponent_Opponent"] <- factor(defense$Opponent_Opponent)
+offClean <- offense
+offClean["Name"] <- factor(offense$Name)
+offClean["Opponent_Opponent"] <- factor(offense$Opponent_Opponent)
+bioClean <- bio
+bioClean["Name"] <- factor(bio$Name)
+```
+
+ *Statistics are numeric*
+
+```{r, warning=FALSE}
+defClean <- defClean %>% mutate(across(where(is.character), as.numeric))
+offClean <- offClean %>% mutate(across(where(is.character), as.numeric))
+bioClean <- bioClean %>% mutate(Weight = as.numeric(Weight))
+
+```
+
+ *Height is numeric*
+
+```{r, warning=FALSE}
+bioClean <- bioClean %>% separate(Height, into = c("Feet", "Inches"), sep = '-') %>% mutate(across(Feet:Inches, as.numeric)) %>%
+  mutate(HeightInch = 12 * Feet + Inches) %>% relocate(Name:Position, before = HeightInch) %>%
+  select(-Feet, -Inches)
+
+```
+
+Since the data is recorded in a Feet-Inches format (which is not especially compatible with functions), it seems best to remake the column into height in inches to maintain the units used while ensuring the data is compatible with R functionality.
+
+ *Part One Final Result*
+
+```{r, warning=FALSE}
+str(defClean)
+str(offClean)
+str(bioClean)
+```
+
+
+## Part 2
+
+ *Tidy defClean*
+
+```{r, warning=FALSE}
+
+```
