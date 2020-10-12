@@ -19,7 +19,7 @@ offense <- read_excel('./cyclonesFootball2019.xlsx', sheet='Offensive')
 bio <- read_excel('./cyclonesFootball2019.xlsx', sheet='Biography')
 ```
 
-## Part One
+## Part 1
 
  *Names are Factors*
 
@@ -68,5 +68,123 @@ str(bioClean)
  *Tidy defClean*
 
 ```{r, warning=FALSE}
-
+tidyDef <- defClean %>% 
+  pivot_longer(Tackles_Solo:Pass_PB, names_to = 'stat', values_to = 'Count')
 ```
+
+
+ *Finding rare defensive skills*
+ 
+```{r, warning=FALSE}
+tidyDef %>% ggplot(aes(x=Count)) + geom_histogram() + facet_wrap(~stat)
+```
+
+From these histograms, we can see that the Turnover statistics are exceedingly rare. In addition, the tackles that were sacks are also fairly uncommon.
+
+ *ISU defense against Iowa and Notre Dame*
+ 
+```{r, warning=FALSE}
+tidyDef %>% filter(stat == "Tackles_Solo" & (Opponent_Opponent == "Iowa" | Opponent_Opponent == "Notre Dame")) %>%
+  pivot_wider(names_from = Opponent_Opponent, values_from = Count) %>%
+  rename(Notre_Dame = `Notre Dame`) %>%
+  ggplot(aes(x=Iowa, y=Notre_Dame)) + geom_point() + labs(title = "Number of tackles per player") + 
+  geom_abline(slope = 1, intercept = 0)
+```
+
+
+As a whole, it seems more points are on the Notre Dame side of the line, indicating that ISU had better defense against Notre Dame than against Iowa.
+
+ *Create City and State columns from Hometown column*
+
+```{r, warning=FALSE}
+playerStates <- bioClean %>% separate(Hometown, into = c("City", "State"), sep = ", ")
+playerStates %>% select(City:State) %>% head
+```
+
+
+ *Counting States*
+
+```{r, warning=FALSE}
+playerStates %>% group_by(State) %>%
+  summarise(n = n())
+```
+
+Note that Australia is not in the United States but was included in the data.
+
+## Part 3
+ 
+ *Finding States of ISU offensive and defensive players*
+
+```{r, warning=FALSE}
+offenseStates <- left_join(offClean, bioClean, by= "Name") %>% 
+  select(Name, Hometown) %>% distinct %>%
+  arrange(Hometown) %>%
+  separate(Hometown, into = c("City", "State"), sep = ", ") %>%
+  select(-City) %>% group_by(State) %>%
+  summarise(n = n())
+defenseStates <- left_join(defClean, bioClean, by= "Name") %>%
+  select(Name, Hometown) %>% distinct %>%
+  arrange(Hometown) %>%
+  separate(Hometown, into = c("City", "State"), sep = ", ") %>%
+  select(-City) %>% group_by(State) %>%
+  summarise(n = n())
+offenseStates
+defenseStates
+```
+
+There seems to be more defense players than offense players. Also, there seems to be a significant number of players not in the biography table.
+
+ *Brock Purdy performance compared to rest of team*
+ 
+```{r, warning=FALSE}
+dat <- offClean %>% mutate_all(funs(replace_na(., 0))) %>% group_by(Name, Opponent_Opponent) %>%
+  summarise(OffensiveScore = Rushing_YDS + Receiving_YDS + Passing_YDS)
+ggplot(filter(dat, Name != "Purdy, Brock"), aes(x = Opponent_Opponent, weight = OffensiveScore)) + geom_bar() + 
+  geom_point(data = filter(dat, Name == "Purdy, Brock"), aes(y = OffensiveScore, group = Opponent_Opponent)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = .5, hjust = 1)) + 
+  labs(x = "Opponent", y = "Offensive Score")
+```
+
+The bars in the chart show the "Offensive Score" of all players on the team besides Brock Purdy. Meanwhile, the points are solely the Offensive score of Brock Purdy. The Offensive score for a single player is the sum of their rushing yards, receiving yards and passing yards. In general, it seems that the team's performance is closely correlated with Brock Purdy's performance.
+
+ *ISU players making big progress across years*
+ 
+```{r, warning=FALSE, include=FALSE}
+#This is the same cleaning done in the original datasets. As such this is not included in the html file.
+defense2018 <- read_excel('./cyclonesFootball2018.xlsx', sheet='Defensive')
+offense2018 <- read_excel('./cyclonesFootball2018.xlsx', sheet='Offensive')
+bio2018 <- read_excel('./cyclonesFootball2018.xlsx', sheet='Biography')
+defClean18 <- defense2018
+defClean18["Name"] <- factor(defense2018$Name)
+defClean18["Opponent_Opponent"] <- factor(defense2018$Opponent_Opponent)
+offClean18 <- offense2018
+offClean18["Name"] <- factor(offense2018$Name)
+offClean18["Opponent_Opponent"] <- factor(offense2018$Opponent_Opponent)
+bioClean18 <- bio2018
+bioClean18["Name"] <- factor(bio2018$Name)
+defClean18 <- defClean18 %>% mutate(across(where(is.character), as.numeric))
+offClean18 <- offClean18 %>% mutate(across(where(is.character), as.numeric))
+bioClean18 <- bioClean18 %>% mutate(Weight = as.numeric(Weight))
+bioClean18 <- bioClean18 %>% separate(Height, into = c("Feet", "Inches"), sep = '-') %>% mutate(across(Feet:Inches, as.numeric)) %>%
+  mutate(HeightInch = 12 * Feet + Inches) %>% relocate(Name:Position, before = HeightInch) %>%
+  select(-Feet, -Inches)
+```
+
+```{r, warning=FALSE}
+off19Score <- offClean %>% mutate_all(funs(replace_na(., 0))) %>% group_by(Name) %>%
+  summarise(OffensiveScore2019 = sum(Rushing_YDS + Receiving_YDS + Passing_YDS))
+off18Score <- offClean18 %>% mutate_all(funs(replace_na(., 0))) %>% group_by(Name) %>%
+  summarise(OffensiveScore2018 = sum(Rushing_YDS + Receiving_YDS + Passing_YDS))
+offComp <- inner_join(off18Score, off19Score, by= "Name")
+def19Tackles <- defClean %>% mutate_all(funs(replace_na(., 0))) %>% group_by(Name) %>%
+  summarise(Tackles2019 = sum(Tackles_Solo))
+def18Tackles <- defClean18 %>% mutate_all(funs(replace_na(., 0))) %>% group_by(Name) %>%
+  summarise(Tackles2018 = sum(Tackles_Solo))
+defComp <- inner_join(def18Tackles, def19Tackles, by= "Name")
+offComp %>% group_by(Name) %>% summarise(improveRatioOff = OffensiveScore2019 / OffensiveScore2018) %>%
+  filter(improveRatioOff > 2) %>% select(Name)
+defComp %>% group_by(Name) %>% summarise(improveRatioDef = Tackles2019 / Tackles2018) %>%
+  filter(improveRatioDef > 2) %>% select(Name)
+```
+
+We utilized the Offensive Score defined above to quantify offensive work while the solo tackles were used for defensive work. A significant improvement in this case is those who have their 2019 score over 2 times as high as their 2018 score. The first list is the players that improved the most offensively, while the second is the players who improved the most defensibly. 
